@@ -14,6 +14,7 @@ const GOOGLE_SHEET_NAME = process.env.GOOGLE_SHEET_NAME || 'Events';
 const GOOGLE_SERVICE_ACCOUNT_EMAIL = process.env.GOOGLE_SERVICE_ACCOUNT_EMAIL || '';
 const GOOGLE_SERVICE_ACCOUNT_PRIVATE_KEY = (process.env.GOOGLE_SERVICE_ACCOUNT_PRIVATE_KEY || '').replace(/\\n/g, '\n');
 const DB_PATH = process.env.DB_PATH || './attendance.db';
+const KAISEN_BOT_URL = process.env.KAISEN_BOT_URL || '';
 const DEBUG_WEBHOOKS = false;
 const DIAG_EVENT_LINE = true;
 const BUSINESS_TIMEZONE = 'Asia/Tashkent';
@@ -755,6 +756,9 @@ app.post('/hikvision/event', upload.any(), async (req, res) => {
             extractedAccessEvent: extractAccessEvent(data)
         };
         await handleEvent(data);
+        if (KAISEN_BOT_URL) {
+            axios.post(KAISEN_BOT_URL, req.body).catch(() => {});
+        }
         res.status(200).send('OK');
     } catch (err) {
         console.error('Handler error:', err.message);
