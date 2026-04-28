@@ -184,9 +184,12 @@ async function sendTelegramToChat(chatId, message) {
 
 async function sendPersonalDm(employeeId, message) {
     if (!employeeId) return;
-    const row = db.prepare('SELECT telegram_chat_id FROM registered_users WHERE employee_id = ?').get(String(employeeId));
-    if (!row) return;
-    await sendTelegramToChat(row.telegram_chat_id, message);
+    const personalBotUrl = process.env.PERSONAL_BOT_URL || 'http://localhost:8092';
+    try {
+        await axios.post(`${personalBotUrl}/notify`, { employeeId, message });
+    } catch (err) {
+        console.error('Personal DM error:', err.message);
+    }
 }
 
 function normalizeGender(rawGender) {
