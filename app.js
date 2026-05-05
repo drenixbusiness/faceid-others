@@ -76,10 +76,12 @@ const EMPLOYEE_SHIFT_MAP = {
     '14':   { name: 'Azizbek Tony',      shiftKey: '5-2' },
     '19':   { name: 'Jessica',           shiftKey: '6-3' },
     '27':   { name: 'Nigora',            shiftKey: '7-4' },
-    '20':   { name: 'Humidullo',         shiftKey: '6-3' },
-    '31':   { name: 'Abdulloh',          shiftKey: '6-3' },
-    '32':   { name: 'Zubayir',           shiftKey: '6-3' },
-    '036':  { name: 'Odina',             shiftKey: '6-3' }
+    '20':   { name: 'Hamidullo',         shiftKey: '6-3' },
+    '036':  { name: 'Odina',             shiftKey: '6-3' },
+    '35':  { name: 'Shaxzoda',             shiftKey: '6-3' },
+    '38':  { name: 'Otabek',             shiftKey: '6-3' },
+    '44':  { name: 'Mexriddin',             shiftKey: '6-3' },
+    '45':  { name: 'Ahmad',             shiftKey: '6-3' },
 };
 
 const EMPLOYEE_SECRET_KEYS = {
@@ -95,9 +97,11 @@ const EMPLOYEE_SECRET_KEYS = {
     '19':   'Fp@sjeh8cu',
     '27':   'g9n&rwiMyh',
     '20':   'Cuywh5he@m',
-    '31':   '9smpds&Cba',
-    '32':   'Jbdiuz9*ew',
-    '036':  'miadqo#D4a'
+    '036':  'miadqo#D4a',
+    '35':  'p!weazbHc4',
+    '38':  '2nq@t#iawr',
+    '44':  'h2#p9ixo8g',
+    '45':  'g#e@wmxn8r'
 };
 // ==================================
 
