@@ -647,7 +647,15 @@ async function handleEvent(data, sourceIp) {
         `🆔 ID: ${employeeId || 'Unknown'}\n` +
         `🕒 Time: ${timeStr}`;
 
-    if (checkType === 'breakIn' || checkType === 'breakOut') return;
+    if (checkType === 'breakIn' || checkType === 'breakOut') {
+        const msg =
+            `${statusMap[checkType]?.emoji || '📌'} <b>${statusMap[checkType]?.label || checkType}</b>\n\n` +
+            `${baseMessage}`;
+
+        await sendTelegram(msg);
+        await sendPersonalDm(employeeId, msg);
+        return;
+    }
     if (!configuredShift) return;
 
     const existingDay = db.prepare(`
