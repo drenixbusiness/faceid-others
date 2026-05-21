@@ -612,6 +612,12 @@ async function handleEvent(data, sourceIp) {
 
     // remap status based on device IP
     statusRaw = remapStatusByDevice(sourceIp, statusRaw);
+    console.log(
+        'DEVICE MAP DEBUG:',
+        'sourceIp=', sourceIp,
+        'raw=', statusRawOriginal,
+        'mapped=', statusRaw
+    );
     const status = statusMap[statusRaw] || {
         label: statusRawOriginal || evt.minorEventType || evt.subEventType || evt.eventType || evt.label || 'Access Event',
         emoji: '📌'
@@ -803,9 +809,13 @@ app.post('/hikvision/event', upload.any(), async (req, res) => {
             extractedAccessEvent: extractAccessEvent(data)
         };
         const sourceIp =
+            req.headers['x-source-ip'] ||
+            req.headers['x-real-ip'] ||
             req.headers['x-forwarded-for']?.split(',')[0]?.trim() ||
             req.socket.remoteAddress?.replace('::ffff:', '') ||
             '';
+
+        console.log('SOURCE IP:', sourceIp);
 
         await handleEvent(data, sourceIp);
         if (KAISEN_BOT_URL) {
