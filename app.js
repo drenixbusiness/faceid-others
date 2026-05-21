@@ -65,43 +65,43 @@ const SHIFT_RULES = {
 
 // ====== OTHER TEAM EMPLOYEES ======
 const EMPLOYEE_SHIFT_MAP = {
-    '001':  { name: 'Suxrob',          shiftKey: '6-3' },
-    '18':   { name: 'Abdulaziz',        shiftKey: '6-3' },
-    '002':  { name: 'Asadbek Odilov',   shiftKey: '7-4' },
-    '7':    { name: 'Fayzulloh Winston', shiftKey: '6-3' },
-    '8':    { name: 'Diyor Ethan',       shiftKey: '6-3' },
-    '9':    { name: 'Fazliddin Fred',    shiftKey: '6-3' },
-    '10':   { name: 'Asadbek Henry',     shiftKey: '5-2' },
-    '11':   { name: 'Amirshoh Alex',     shiftKey: '6-3' },
-    '14':   { name: 'Azizbek Tony',      shiftKey: '5-2' },
-    '19':   { name: 'Jessica',           shiftKey: '6-3' },
-    '27':   { name: 'Nigora',            shiftKey: '7-4' },
-    '20':   { name: 'Hamidullo',         shiftKey: '6-3' },
-    '036':  { name: 'Odina',             shiftKey: '6-3' },
-    '35':  { name: 'Shaxzoda',             shiftKey: '6-3' },
-    '38':  { name: 'Otabek',             shiftKey: '6-3' },
-    '44':  { name: 'Mexriddin',             shiftKey: '6-3' },
-    '45':  { name: 'Ahmad',             shiftKey: '6-3' },
+    '001': { name: 'Suxrob', shiftKey: '6-3' },
+    '18': { name: 'Abdulaziz', shiftKey: '6-3' },
+    '002': { name: 'Asadbek Odilov', shiftKey: '7-4' },
+    '7': { name: 'Fayzulloh Winston', shiftKey: '6-3' },
+    '8': { name: 'Diyor Ethan', shiftKey: '6-3' },
+    '9': { name: 'Fazliddin Fred', shiftKey: '6-3' },
+    '10': { name: 'Asadbek Henry', shiftKey: '5-2' },
+    '11': { name: 'Amirshoh Alex', shiftKey: '6-3' },
+    '14': { name: 'Azizbek Tony', shiftKey: '5-2' },
+    '19': { name: 'Jessica', shiftKey: '6-3' },
+    '27': { name: 'Nigora', shiftKey: '7-4' },
+    '20': { name: 'Hamidullo', shiftKey: '6-3' },
+    '036': { name: 'Odina', shiftKey: '6-3' },
+    '35': { name: 'Shaxzoda', shiftKey: '6-3' },
+    '38': { name: 'Otabek', shiftKey: '6-3' },
+    '44': { name: 'Mexriddin', shiftKey: '6-3' },
+    '45': { name: 'Ahmad', shiftKey: '6-3' },
 };
 
 const EMPLOYEE_SECRET_KEYS = {
-    '001':  '4yB!isuxrs',
-    '18':   'byyDd5g@aa',
-    '002':  '#sFtgaays3',
-    '7':    'Wy!ahyf8nr',
-    '8':    'k!wir2Ydwy',
-    '9':    '2habzgfUc#',
-    '10':   '&y9Maefska',
-    '11':   'nq@ia4mMjr',
-    '14':   'v4wbRi!raz',
-    '19':   'Fp@sjeh8cu',
-    '27':   'g9n&rwiMyh',
-    '20':   'Cuywh5he@m',
-    '036':  'miadqo#D4a',
-    '35':  'p!weazbHc4',
-    '38':  '2nq@t#iawr',
-    '44':  'h2#p9ixo8g',
-    '45':  'g#e@wmxn8r'
+    '001': '4yB!isuxrs',
+    '18': 'byyDd5g@aa',
+    '002': '#sFtgaays3',
+    '7': 'Wy!ahyf8nr',
+    '8': 'k!wir2Ydwy',
+    '9': '2habzgfUc#',
+    '10': '&y9Maefska',
+    '11': 'nq@ia4mMjr',
+    '14': 'v4wbRi!raz',
+    '19': 'Fp@sjeh8cu',
+    '27': 'g9n&rwiMyh',
+    '20': 'Cuywh5he@m',
+    '036': 'miadqo#D4a',
+    '35': 'p!weazbHc4',
+    '38': '2nq@t#iawr',
+    '44': 'h2#p9ixo8g',
+    '45': 'g#e@wmxn8r'
 };
 // ==================================
 
@@ -331,6 +331,35 @@ const statusAliases = {
     breakout: 'breakOut'
 };
 
+// ===== DEVICE STATUS REMAPPING =====
+const OUTSIDE_DEVICE_IPS = (process.env.OUTSIDE_DEVICE_IPS || '')
+    .split(',')
+    .map(ip => ip.trim())
+    .filter(Boolean);
+
+const INSIDE_DEVICE_IPS = (process.env.INSIDE_DEVICE_IPS || '')
+    .split(',')
+    .map(ip => ip.trim())
+    .filter(Boolean);
+
+function remapStatusByDevice(deviceIp, statusRaw) {
+    if (!deviceIp || !statusRaw) return statusRaw;
+
+    // OUTSIDE TERMINAL
+    if (OUTSIDE_DEVICE_IPS.includes(deviceIp)) {
+        if (statusRaw === 'checkOut') return 'breakIn';
+        return statusRaw;
+    }
+
+    // INSIDE TERMINAL
+    if (INSIDE_DEVICE_IPS.includes(deviceIp)) {
+        if (statusRaw === 'checkIn') return 'breakOut';
+        return statusRaw;
+    }
+
+    return statusRaw;
+}
+
 const recentEventCache = new Map();
 let lastWebhookSnapshot = null;
 let sheetsClientPromise = null;
@@ -550,7 +579,7 @@ function isDuplicateEvent(evt, employeeId, normalizedStatus) {
     return lastSeen && now - lastSeen < 15000;
 }
 
-async function handleEvent(data) {
+async function handleEvent(data, sourceIp) {
     let evt = extractAccessEvent(data);
     if (!evt) return;
     if (typeof evt === 'string') {
@@ -579,7 +608,10 @@ async function handleEvent(data) {
     const statusRawOriginal =
         evt.attendanceStatus || evt.status || evt.checkType ||
         evt.AccessControllerEvent?.attendanceStatus || evt.AccessControllerEvent?.status || evt.AccessControllerEvent?.checkType;
-    const statusRaw = statusAliases[String(statusRawOriginal || '').trim().toLowerCase()] || statusRawOriginal;
+    let statusRaw = statusAliases[String(statusRawOriginal || '').trim().toLowerCase()] || statusRawOriginal;
+
+    // remap status based on device IP
+    statusRaw = remapStatusByDevice(sourceIp, statusRaw);
     const status = statusMap[statusRaw] || {
         label: statusRawOriginal || evt.minorEventType || evt.subEventType || evt.eventType || evt.label || 'Access Event',
         emoji: '📌'
@@ -762,9 +794,14 @@ app.post('/hikvision/event', upload.any(), async (req, res) => {
             topLevelKeys: Object.keys(data || {}),
             extractedAccessEvent: extractAccessEvent(data)
         };
-        await handleEvent(data);
+        const sourceIp =
+            req.headers['x-forwarded-for']?.split(',')[0]?.trim() ||
+            req.socket.remoteAddress?.replace('::ffff:', '') ||
+            '';
+
+        await handleEvent(data, sourceIp);
         if (KAISEN_BOT_URL) {
-            axios.post(KAISEN_BOT_URL, req.body).catch(() => {});
+            axios.post(KAISEN_BOT_URL, req.body).catch(() => { });
         }
         res.status(200).send('OK');
     } catch (err) {
