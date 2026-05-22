@@ -304,6 +304,16 @@ function resolveShiftDateForEvent(eventTime, shift) {
 }
 
 function classifyPunch(eventTime, statusRaw, shift, shiftDate) {
+    if (statusRaw === 'insideExit') {
+        const checkOutFrom = makeShiftDateTime(shiftDate, shift.validCheckOutFrom, shift.checkOutDayOffset);
+        const checkOutTo = makeShiftDateTime(shiftDate, shift.validCheckOutTo, shift.checkOutDayOffset);
+
+        if (eventTime >= checkOutFrom && eventTime <= checkOutTo) {
+            return 'checkOut';
+        }
+
+        return 'breakOut';
+    }
     if (statusRaw === 'checkIn') return 'checkIn';
     if (statusRaw === 'checkOut') return 'checkOut';
     if (statusRaw === 'breakIn') return 'breakIn';
@@ -345,16 +355,14 @@ const INSIDE_DEVICE_IPS = (process.env.INSIDE_DEVICE_IPS || '')
 function remapStatusByDevice(deviceIp, statusRaw) {
     if (!deviceIp || !statusRaw) return statusRaw;
 
-    // OUTSIDE TERMINAL: everything is entering
+    // OUTSIDE: everything except first Check In can become Break In later
     if (OUTSIDE_DEVICE_IPS.includes(deviceIp)) {
-        if (statusRaw === 'checkIn') return 'checkIn';
-        return 'breakIn';
+        return 'checkIn';
     }
 
-    // INSIDE TERMINAL: everything is leaving
+    // INSIDE: code will decide Break Out vs Check Out by time
     if (INSIDE_DEVICE_IPS.includes(deviceIp)) {
-        if (statusRaw === 'checkOut') return 'checkOut';
-        return 'breakOut';
+        return 'insideExit';
     }
 
     return statusRaw;
@@ -665,16 +673,39 @@ async function handleEvent(data, sourceIp) {
     if (!configuredShift) return;
 
     const existingDay = db.prepare(`
-      SELECT * FROM daily_attendance WHERE employee_id = ? AND shift_date = ?
-    `).get(employeeId, shiftDate);
+  SELECT * FROM daily_attendance WHERE employee_id = ? AND shift_date = ?
+`).get(employeeId, shiftDate);
 
     if (checkType === 'checkIn') {
         const botCheckInNotificationsFromMin = hhmmToMinutes(BOT_CHECKIN_NOTIFICATIONS_FROM_HHMM);
+
         if (getMinutesInZone(eventTime) < botCheckInNotificationsFromMin) {
             if (DIAG_EVENT_LINE) console.log(`↳ early check-in ignored | id=${employeeId || '-'} | before=${BOT_CHECKIN_NOTIFICATIONS_FROM_HHMM}`);
             return;
         }
-        if (existingDay && existingDay.first_check_in_at) return;
+
+        if (existingDay && existingDay.first_check_in_at) {
+            const lastBreakOut = db.prepare(`
+          SELECT timestamp FROM attendance
+          WHERE employee_id = ? AND status = 'breakOut' AND timestamp < ?
+          ORDER BY timestamp DESC
+          LIMIT 1
+        `).get(employeeId, eventTime.toISOString());
+
+            let breakDurationText = '';
+            if (lastBreakOut) {
+                breakDurationText = `\n⏱ Break duration: <b>${formatDuration(new Date(lastBreakOut.timestamp), eventTime)}</b>`;
+            }
+
+            const msg =
+                `🔙 <b>Break In</b>\n\n` +
+                `${baseMessage}` +
+                breakDurationText;
+
+            await sendTelegram(msg);
+            await sendPersonalDm(employeeId, msg);
+            return;
+        }
 
         const workStart = makeShiftDateTime(shiftDate, configuredShift.workStart, 0);
         const lateMin = minutesBetween(eventTime, workStart);
@@ -682,21 +713,22 @@ async function handleEvent(data, sourceIp) {
         const didntComeFlag = lateMin > VERY_LATE_AFTER_MIN;
 
         db.prepare(`
-          INSERT INTO daily_attendance (
-            employee_id, shift_date, shift_key,
-            first_check_in_at, first_check_in_name, first_check_in_gender, first_check_in_late_min
-          ) VALUES (?, ?, ?, ?, ?, ?, ?)
-          ON CONFLICT(employee_id, shift_date) DO UPDATE SET
-            shift_key = excluded.shift_key,
-            first_check_in_at = COALESCE(daily_attendance.first_check_in_at, excluded.first_check_in_at),
-            first_check_in_name = COALESCE(daily_attendance.first_check_in_name, excluded.first_check_in_name),
-            first_check_in_gender = COALESCE(daily_attendance.first_check_in_gender, excluded.first_check_in_gender),
-            first_check_in_late_min = COALESCE(daily_attendance.first_check_in_late_min, excluded.first_check_in_late_min)
-        `).run(employeeId, shiftDate, shiftInfo.shiftKey, eventTime.toISOString(), employeeName || 'Unknown', gender, lateMin);
+      INSERT INTO daily_attendance (
+        employee_id, shift_date, shift_key,
+        first_check_in_at, first_check_in_name, first_check_in_gender, first_check_in_late_min
+      ) VALUES (?, ?, ?, ?, ?, ?, ?)
+      ON CONFLICT(employee_id, shift_date) DO UPDATE SET
+        shift_key = excluded.shift_key,
+        first_check_in_at = COALESCE(daily_attendance.first_check_in_at, excluded.first_check_in_at),
+        first_check_in_name = COALESCE(daily_attendance.first_check_in_name, excluded.first_check_in_name),
+        first_check_in_gender = COALESCE(daily_attendance.first_check_in_gender, excluded.first_check_in_gender),
+        first_check_in_late_min = COALESCE(daily_attendance.first_check_in_late_min, excluded.first_check_in_late_min)
+    `).run(employeeId, shiftDate, shiftInfo.shiftKey, eventTime.toISOString(), employeeName || 'Unknown', gender, lateMin);
 
         let header = '✅ <b>On-Time Check In</b>';
         if (lateFlag) header = '⏰ <b>Late Check In</b>';
         if (didntComeFlag) header = '🚫 <b>Very Late</b>';
+
         let msg = `${header}\n\n🏷 Shift: ${configuredShift.label}\n${baseMessage}`;
         if (didntComeFlag) msg += `\n🚫 Marked as: <b>Did Not Come</b>\n⏱ Late by: <b>${lateMin} min</b>`;
         else if (lateFlag) msg += `\n\n🚨 Late by: <b>${lateMin} min</b>`;
@@ -704,40 +736,73 @@ async function handleEvent(data, sourceIp) {
 
         await sendTelegram(msg);
         await sendPersonalDm(employeeId, msg);
-        await appendEventToGoogleSheet(buildSheetRow({
-            timeLocal: timeStr, employeeId, employeeName,
-            action: didntComeFlag ? `Did Not Come (Checked In >${VERY_LATE_AFTER_MIN}m)` : (lateFlag ? 'Late Check In' : 'On-Time Check In'),
-            shiftTime: formatShiftTime(configuredShift), shiftDate,
-            lateMinutes: lateMin, didntCome: didntComeFlag
-        }));
-        console.log(`✅ SENT: first check-in (${didntComeFlag ? 'did-not-come' : (lateFlag ? 'late' : 'on-time')}) — ${employeeName} (${employeeId})`);
         return;
     }
 
     if (checkType === 'checkOut') {
         db.prepare(`
-          INSERT INTO daily_attendance (employee_id, shift_date, shift_key, check_out_at)
-          VALUES (?, ?, ?, ?)
-          ON CONFLICT(employee_id, shift_date) DO UPDATE SET
-            shift_key = excluded.shift_key,
-            check_out_at = excluded.check_out_at
-        `).run(employeeId, shiftDate, shiftInfo.shiftKey, eventTime.toISOString());
+      INSERT INTO daily_attendance (employee_id, shift_date, shift_key, check_out_at)
+      VALUES (?, ?, ?, ?)
+      ON CONFLICT(employee_id, shift_date) DO UPDATE SET
+        shift_key = excluded.shift_key,
+        check_out_at = excluded.check_out_at
+    `).run(employeeId, shiftDate, shiftInfo.shiftKey, eventTime.toISOString());
 
         const dayRow = db.prepare(`
-          SELECT first_check_in_at FROM daily_attendance WHERE employee_id = ? AND shift_date = ?
-        `).get(employeeId, shiftDate);
+      SELECT first_check_in_at FROM daily_attendance WHERE employee_id = ? AND shift_date = ?
+    `).get(employeeId, shiftDate);
+
         let msg = `🏁 <b>Check Out</b>\n🏷 Shift: ${configuredShift.label}\n${baseMessage}`;
+
         if (dayRow && dayRow.first_check_in_at) {
             msg += `\n⏱ Worked: <b>${formatWorkedDuration(dayRow.first_check_in_at, eventTime, shiftDate, configuredShift)}</b>`;
         }
+
         await sendTelegram(msg);
         await sendPersonalDm(employeeId, msg);
-        await appendEventToGoogleSheet(buildSheetRow({
-            timeLocal: timeStr, employeeId, employeeName,
-            action: 'Check Out', shiftTime: formatShiftTime(configuredShift), shiftDate
-        }));
-        console.log(`✅ SENT: check-out — ${employeeName} (${employeeId})`);
         return;
+    }
+}
+
+async function runBreakOvertimeCheck() {
+    const now = new Date();
+    const cutoff = new Date(now.getTime() - BREAK_LIMIT_MIN * 60000).toISOString();
+    const windowStart = new Date(now.getTime() - 12 * 60 * 60000).toISOString();
+
+    const overdueBreaks = db.prepare(`
+      SELECT a.employee_id, a.employee_name, a.timestamp
+      FROM attendance a
+      WHERE a.status = 'breakOut'
+        AND a.timestamp <= ?
+        AND a.timestamp >= ?
+        AND NOT EXISTS (
+          SELECT 1 FROM attendance b
+          WHERE b.employee_id = a.employee_id
+            AND b.status = 'breakIn'
+            AND b.timestamp > a.timestamp
+        )
+        AND NOT EXISTS (
+          SELECT 1 FROM break_overtime_alerts x
+          WHERE x.employee_id = a.employee_id
+            AND x.break_out_at = a.timestamp
+        )
+    `).all(cutoff, windowStart);
+
+    for (const row of overdueBreaks) {
+        const msg =
+            `⚠️ <b>Break Warning</b>\n\n` +
+            `👤 Name: ${row.employee_name || 'Unknown'}\n` +
+            `🆔 ID: ${row.employee_id}\n` +
+            `⏱ Break time: <b>${formatDuration(new Date(row.timestamp), now)}</b>\n` +
+            `🚨 Please come back. You have been on break for more than ${BREAK_LIMIT_MIN} minutes.`;
+
+        db.prepare(`
+          INSERT OR IGNORE INTO break_overtime_alerts (employee_id, break_out_at, alerted_at)
+          VALUES (?, ?, ?)
+        `).run(row.employee_id, row.timestamp, now.toISOString());
+
+        await sendTelegram(msg);
+        await sendPersonalDm(row.employee_id, msg);
     }
 }
 
@@ -843,6 +908,10 @@ app.listen(PORT, '0.0.0.0', () => {
         console.log('📄 Google Sheets logging is disabled (env vars missing).');
     }
 });
+
+setInterval(() => {
+    runBreakOvertimeCheck().catch((err) => console.error('Break overtime check error:', err.message));
+}, 60000);
 
 setInterval(() => {
     runNoShowCheck().catch((err) => console.error('No-show check error:', err.message));
