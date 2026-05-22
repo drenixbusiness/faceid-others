@@ -345,16 +345,16 @@ const INSIDE_DEVICE_IPS = (process.env.INSIDE_DEVICE_IPS || '')
 function remapStatusByDevice(deviceIp, statusRaw) {
     if (!deviceIp || !statusRaw) return statusRaw;
 
-    // OUTSIDE TERMINAL
+    // OUTSIDE TERMINAL: everything is entering
     if (OUTSIDE_DEVICE_IPS.includes(deviceIp)) {
-        if (statusRaw === 'checkOut') return 'breakIn';
-        return statusRaw;
+        if (statusRaw === 'checkIn') return 'checkIn';
+        return 'breakIn';
     }
 
-    // INSIDE TERMINAL
+    // INSIDE TERMINAL: everything is leaving
     if (INSIDE_DEVICE_IPS.includes(deviceIp)) {
-        if (statusRaw === 'checkIn') return 'breakOut';
-        return statusRaw;
+        if (statusRaw === 'checkOut') return 'checkOut';
+        return 'breakOut';
     }
 
     return statusRaw;
