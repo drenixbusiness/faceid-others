@@ -662,12 +662,6 @@ async function handleEvent(data, sourceIp) {
         `🕒 Time: ${timeStr}`;
 
     if (checkType === 'breakIn' || checkType === 'breakOut') {
-        const msg =
-            `${statusMap[checkType]?.emoji || '📌'} <b>${statusMap[checkType]?.label || checkType}</b>\n\n` +
-            `${baseMessage}`;
-
-        await sendTelegram(msg);
-        await sendPersonalDm(employeeId, msg);
         return;
     }
     if (!configuredShift) return;
@@ -817,7 +811,6 @@ async function runBreakOvertimeCheck() {
           VALUES (?, ?, ?)
         `).run(row.employee_id, row.timestamp, now.toISOString());
 
-        await sendTelegram(msg);
         await sendPersonalDm(row.employee_id, msg);
     }
 }
