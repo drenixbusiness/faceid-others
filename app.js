@@ -686,16 +686,32 @@ async function handleEvent(data, sourceIp) {
 
         if (existingDay && existingDay.first_check_in_at) {
             const lastBreakOut = db.prepare(`
-          SELECT timestamp FROM attendance
-          WHERE employee_id = ? AND status = 'breakOut' AND timestamp < ?
-          ORDER BY timestamp DESC
-          LIMIT 1
-        `).get(employeeId, eventTime.toISOString());
+      SELECT timestamp FROM attendance
+      WHERE employee_id = ? AND status = 'breakOut' AND timestamp < ?
+      ORDER BY timestamp DESC
+      LIMIT 1
+    `).get(employeeId, eventTime.toISOString());
 
             let breakDurationText = '';
             if (lastBreakOut) {
                 breakDurationText = `\n⏱ Break duration: <b>${formatDuration(new Date(lastBreakOut.timestamp), eventTime)}</b>`;
             }
+
+            db.prepare(`
+      INSERT INTO attendance (
+        employee_id,
+        employee_name,
+        employee_gender,
+        status,
+        timestamp
+      ) VALUES (?, ?, ?, ?, ?)
+    `).run(
+                employeeId || 'unknown',
+                employeeName || 'unknown',
+                gender,
+                'breakIn',
+                eventTime.toISOString()
+            );
 
             const msg =
                 `🔙 <b>Break In</b>\n\n` +
