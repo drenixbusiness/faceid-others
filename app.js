@@ -707,13 +707,6 @@ async function handleEvent(data, sourceIp) {
                 eventTime.toISOString()
             );
 
-            const msg =
-                `🔙 <b>Break In</b>\n\n` +
-                `${baseMessage}` +
-                breakDurationText;
-
-            await sendTelegram(msg);
-            await sendPersonalDm(employeeId, msg);
             return;
         }
 
