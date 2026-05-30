@@ -674,31 +674,7 @@ async function handleEvent(data, sourceIp) {
         `🆔 ID: ${employeeId || 'Unknown'}\n` +
         `🕒 Time: ${timeStr}`;
 
-    if (checkType === 'breakOut') {
-        const msg =
-            `☕ <b>TEST Break Out</b>\n\n` +
-            `👤 Name: ${employeeName || 'Unknown'}\n` +
-            `🆔 ID: ${employeeId || 'Unknown'}\n` +
-            `🕒 Time: ${timeStr}\n` +
-            `📍 Source IP: ${sourceIp}\n` +
-            `🧾 Raw status: ${statusRawOriginal || 'empty'}\n` +
-            `✅ Mapped status: ${statusRaw}`;
-
-        await sendTelegram(msg);
-        return;
-    }
-
-    if (checkType === 'breakIn') {
-        const msg =
-            `🔙 <b>TEST Break In</b>\n\n` +
-            `👤 Name: ${employeeName || 'Unknown'}\n` +
-            `🆔 ID: ${employeeId || 'Unknown'}\n` +
-            `🕒 Time: ${timeStr}\n` +
-            `📍 Source IP: ${sourceIp}\n` +
-            `🧾 Raw status: ${statusRawOriginal || 'empty'}\n` +
-            `✅ Mapped status: ${statusRaw}`;
-
-        await sendTelegram(msg);
+    if (checkType === 'breakIn' || checkType === 'breakOut') {
         return;
     }
 
@@ -717,34 +693,7 @@ async function handleEvent(data, sourceIp) {
         }
 
         if (existingDay && existingDay.first_check_in_at) {
-            const lastBreakOut = db.prepare(`
-      SELECT timestamp FROM attendance
-      WHERE employee_id = ? AND status = 'breakOut' AND timestamp < ?
-      ORDER BY timestamp DESC
-      LIMIT 1
-    `).get(employeeId, eventTime.toISOString());
-
-            let breakDurationText = '';
-            if (lastBreakOut) {
-                breakDurationText = `\n⏱ Break duration: <b>${formatDuration(new Date(lastBreakOut.timestamp), eventTime)}</b>`;
-            }
-
-            db.prepare(`
-      INSERT INTO attendance (
-        employee_id,
-        employee_name,
-        employee_gender,
-        status,
-        timestamp
-      ) VALUES (?, ?, ?, ?, ?)
-    `).run(
-                employeeId || 'unknown',
-                employeeName || 'unknown',
-                gender,
-                'breakIn',
-                eventTime.toISOString()
-            );
-
+            console.log(`↳ duplicate check-in ignored | id=${employeeId || '-'} | already checked in`);
             return;
         }
 
