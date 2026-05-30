@@ -82,6 +82,9 @@ const EMPLOYEE_SHIFT_MAP = {
     '38': { name: 'Otabek', shiftKey: '6-3' },
     '44': { name: 'Mexriddin', shiftKey: '6-3' },
     '45': { name: 'Ahmad', shiftKey: '6-3' },
+    '47': { name: 'Dilshod', shiftKey: '6-3' },
+    '49': { name: 'Bexruz', shiftKey: '6-3' },
+    '52': { name: 'Asilbek', shiftKey: '6-3' },
 };
 
 const EMPLOYEE_SECRET_KEYS = {
@@ -101,7 +104,10 @@ const EMPLOYEE_SECRET_KEYS = {
     '35': 'p!weazbHc4',
     '38': '2nq@t#iawr',
     '44': 'h2#p9ixo8g',
-    '45': 'g#e@wmxn8r'
+    '45': 'g#e@wmxn8r',
+    '47': 's!l7y@5z2x',
+    '49': '7s@8zqjv4y',
+    '52': 'u@6y9Maefsk'
 };
 // ==================================
 
