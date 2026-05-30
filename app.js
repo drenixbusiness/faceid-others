@@ -20,7 +20,7 @@ const DIAG_EVENT_LINE = true;
 const BUSINESS_TIMEZONE = 'Asia/Tashkent';
 const BUSINESS_OFFSET = '+05:00';
 const NO_SHOW_CHECK_INTERVAL_MS = 60000;
-const BREAK_LIMIT_MIN = 60;
+const BREAK_LIMIT_MIN = 30;
 const ON_TIME_GRACE_MIN = 10;
 const DIDNT_COME_AFTER_MIN = 120;
 const VERY_LATE_AFTER_MIN = DIDNT_COME_AFTER_MIN + ON_TIME_GRACE_MIN;
@@ -352,18 +352,40 @@ const INSIDE_DEVICE_IPS = (process.env.INSIDE_DEVICE_IPS || '')
     .map(ip => ip.trim())
     .filter(Boolean);
 
-function remapStatusByDevice(deviceIp, statusRaw) {
-    if (!deviceIp || !statusRaw) return statusRaw;
+function normalizeVerifyMode(evt) {
+    const raw =
+        evt.currentVerifyMode ||
+        evt.verifyMode ||
+        evt.verificationMode ||
+        evt.authMode ||
+        evt.readerVerifyMode ||
+        evt.AccessControllerEvent?.currentVerifyMode ||
+        evt.AccessControllerEvent?.verifyMode ||
+        evt.AccessControllerEvent?.verificationMode ||
+        evt.AccessControllerEvent?.authMode ||
+        evt.AccessControllerEvent?.readerVerifyMode ||
+        '';
 
-    // OUTSIDE: everything except first Check In can become Break In later
-    if (OUTSIDE_DEVICE_IPS.includes(deviceIp)) {
-        return 'checkIn';
-    }
+    const value = String(raw).toLowerCase();
 
-    // INSIDE: code will decide Break Out vs Check Out by time
-    if (INSIDE_DEVICE_IPS.includes(deviceIp)) {
-        return 'insideExit';
-    }
+    if (value.includes('finger')) return 'fingerprint';
+    if (value.includes('fp')) return 'fingerprint';
+    if (value.includes('face')) return 'face';
+
+    return 'unknown';
+}
+
+function remapStatusByDeviceAndVerifyMode(deviceIp, evt, statusRaw) {
+    const verifyMode = normalizeVerifyMode(evt);
+
+    const isOutside = OUTSIDE_DEVICE_IPS.includes(deviceIp);
+    const isInside = INSIDE_DEVICE_IPS.includes(deviceIp);
+
+    if (isOutside && verifyMode === 'fingerprint') return 'checkIn';
+    if (isInside && verifyMode === 'fingerprint') return 'checkOut';
+
+    if (isInside && verifyMode === 'face') return 'breakOut';
+    if (isOutside && verifyMode === 'face') return 'breakIn';
 
     return statusRaw;
 }
@@ -619,10 +641,11 @@ async function handleEvent(data, sourceIp) {
     let statusRaw = statusAliases[String(statusRawOriginal || '').trim().toLowerCase()] || statusRawOriginal;
 
     // remap status based on device IP
-    statusRaw = remapStatusByDevice(sourceIp, statusRaw);
+    statusRaw = remapStatusByDeviceAndVerifyMode(sourceIp, evt, statusRaw);
     console.log(
         'DEVICE MAP DEBUG:',
         'sourceIp=', sourceIp,
+        'verifyMode=', normalizeVerifyMode(evt),
         'raw=', statusRawOriginal,
         'mapped=', statusRaw
     );
