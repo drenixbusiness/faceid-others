@@ -611,6 +611,7 @@ function isDuplicateEvent(evt, employeeId, normalizedStatus) {
 
 async function handleEvent(data, sourceIp) {
     let evt = extractAccessEvent(data);
+    console.log('RAW HIKVISION EVENT:', JSON.stringify(evt, null, 2));
     if (!evt) return;
     if (typeof evt === 'string') {
         try { evt = JSON.parse(evt); } catch (e) { return; }
@@ -684,9 +685,34 @@ async function handleEvent(data, sourceIp) {
         `🆔 ID: ${employeeId || 'Unknown'}\n` +
         `🕒 Time: ${timeStr}`;
 
-    if (checkType === 'breakIn' || checkType === 'breakOut') {
+    if (checkType === 'breakOut') {
+        const msg =
+            `☕ <b>TEST Break Out</b>\n\n` +
+            `👤 Name: ${employeeName || 'Unknown'}\n` +
+            `🆔 ID: ${employeeId || 'Unknown'}\n` +
+            `🕒 Time: ${timeStr}\n` +
+            `📍 Source IP: ${sourceIp}\n` +
+            `🧾 Raw status: ${statusRawOriginal || 'empty'}\n` +
+            `✅ Mapped status: ${statusRaw}`;
+
+        await sendTelegram(msg);
         return;
     }
+
+    if (checkType === 'breakIn') {
+        const msg =
+            `🔙 <b>TEST Break In</b>\n\n` +
+            `👤 Name: ${employeeName || 'Unknown'}\n` +
+            `🆔 ID: ${employeeId || 'Unknown'}\n` +
+            `🕒 Time: ${timeStr}\n` +
+            `📍 Source IP: ${sourceIp}\n` +
+            `🧾 Raw status: ${statusRawOriginal || 'empty'}\n` +
+            `✅ Mapped status: ${statusRaw}`;
+
+        await sendTelegram(msg);
+        return;
+    }
+    
     if (!configuredShift) return;
 
     const existingDay = db.prepare(`
