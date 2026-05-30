@@ -353,26 +353,15 @@ const INSIDE_DEVICE_IPS = (process.env.INSIDE_DEVICE_IPS || '')
     .filter(Boolean);
 
 function normalizeVerifyMode(evt) {
-    const raw =
-        evt.currentVerifyMode ||
-        evt.verifyMode ||
-        evt.verificationMode ||
-        evt.authMode ||
-        evt.readerVerifyMode ||
-        evt.AccessControllerEvent?.currentVerifyMode ||
-        evt.AccessControllerEvent?.verifyMode ||
-        evt.AccessControllerEvent?.verificationMode ||
-        evt.AccessControllerEvent?.authMode ||
-        evt.AccessControllerEvent?.readerVerifyMode ||
-        '';
+    // FaceID events from Hikvision include FaceRect
+    if (evt.FaceRect || evt.AccessControllerEvent?.FaceRect) {
+        return 'face';
+    }
 
-    const value = String(raw).toLowerCase();
-
-    if (value.includes('finger')) return 'fingerprint';
-    if (value.includes('fp')) return 'fingerprint';
-    if (value.includes('face')) return 'face';
-
-    return 'unknown';
+    // In your device, currentVerifyMode is not the actual method.
+    // It only says allowed methods: faceOrFpOrCardOrPw.
+    // So if there is no FaceRect, treat it as fingerprint.
+    return 'fingerprint';
 }
 
 function remapStatusByDeviceAndVerifyMode(deviceIp, evt, statusRaw) {
@@ -712,7 +701,7 @@ async function handleEvent(data, sourceIp) {
         await sendTelegram(msg);
         return;
     }
-    
+
     if (!configuredShift) return;
 
     const existingDay = db.prepare(`
