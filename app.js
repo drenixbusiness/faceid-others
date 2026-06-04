@@ -365,6 +365,10 @@ function normalizeVerifyMode(evt) {
 }
 
 function remapStatusByDeviceAndVerifyMode(deviceIp, evt, statusRaw) {
+    // Device is in Manual attendance mode — it sends breakIn/breakOut directly.
+    // Trust these and skip the FaceRect-based remap (FaceRect is not always present).
+    if (statusRaw === 'breakIn' || statusRaw === 'breakOut') return statusRaw;
+
     const verifyMode = normalizeVerifyMode(evt);
 
     const isOutside = OUTSIDE_DEVICE_IPS.includes(deviceIp);
