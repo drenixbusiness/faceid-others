@@ -874,7 +874,7 @@ app.post('/hikvision/event', upload.any(), async (req, res) => {
 
         await handleEvent(data, sourceIp);
         if (KAISEN_BOT_URL) {
-            axios.post(KAISEN_BOT_URL, req.body).catch(() => { });
+            axios.post(KAISEN_BOT_URL, req.body, { headers: { 'x-source-ip': sourceIp } }).catch(() => { });
         }
         res.status(200).send('OK');
     } catch (err) {
