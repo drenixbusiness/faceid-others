@@ -192,6 +192,7 @@ async function sendPersonalDm(employeeId, message) {
     try {
         await axios.post(`${personalBotUrl}/notify`, { employeeId, message });
     } catch (err) {
+        if (err.response?.status === 404) return; // employee not registered — expected
         console.error('Personal DM error:', err.message);
     }
 }
