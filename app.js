@@ -366,21 +366,17 @@ function normalizeVerifyMode(evt) {
 }
 
 function remapStatusByDeviceAndVerifyMode(deviceIp, evt, statusRaw) {
-    // Trust explicit attendance status directly (Manual mode).
-    if (statusRaw === 'checkIn' || statusRaw === 'checkOut') return statusRaw;
-    if (statusRaw === 'breakIn' || statusRaw === 'breakOut') return statusRaw;
-
+    // Ignore what the device says — it only has Break In / Break Out buttons (On/Off Work disabled).
+    // Determine actual meaning purely from which device and which scan method.
     const verifyMode = normalizeVerifyMode(evt);
-
     const isOutside = OUTSIDE_DEVICE_IPS.includes(deviceIp);
     const isInside = INSIDE_DEVICE_IPS.includes(deviceIp);
 
-    // Face ID = break operations only
+    if (isOutside && verifyMode === 'fingerprint') return 'checkIn';
+    if (isInside && verifyMode === 'fingerprint') return 'checkOut';
     if (isInside && verifyMode === 'face') return 'breakOut';
     if (isOutside && verifyMode === 'face') return 'breakIn';
 
-    // Fingerprint with no explicit status: let classifyPunch decide via time windows.
-    // Accidental mid-shift fingerprint falls outside any window → stored as 'access', no message.
     return statusRaw;
 }
 
