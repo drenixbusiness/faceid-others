@@ -366,8 +366,8 @@ function normalizeVerifyMode(evt) {
 }
 
 function remapStatusByDeviceAndVerifyMode(deviceIp, evt, statusRaw) {
-    // Device is in Manual attendance mode — it sends breakIn/breakOut directly.
-    // Trust these and skip the FaceRect-based remap (FaceRect is not always present).
+    // Device is in Manual attendance mode — trust explicit statuses directly.
+    if (statusRaw === 'checkIn' || statusRaw === 'checkOut') return statusRaw;
     if (statusRaw === 'breakIn' || statusRaw === 'breakOut') return statusRaw;
 
     const verifyMode = normalizeVerifyMode(evt);
@@ -773,7 +773,7 @@ async function runBreakOvertimeCheck() {
         AND NOT EXISTS (
           SELECT 1 FROM attendance b
           WHERE b.employee_id = a.employee_id
-            AND b.status = 'breakIn'
+            AND b.status IN ('breakIn', 'checkIn', 'checkOut')
             AND b.timestamp > a.timestamp
         )
         AND NOT EXISTS (
